@@ -994,6 +994,7 @@ fn write_sim_summaries_csv(summaries: &[tfmm_sim::SimulationSummary]) -> Result<
     let path = "results/sim_summaries.csv";
     let mut wtr = csv::Writer::from_path(path)?;
 
+    // CSVのヘッダー（列名）にPFDAの指標を追加
     wtr.write_record([
         "label",
         "slots",
@@ -1010,6 +1011,12 @@ fn write_sim_summaries_csv(summaries: &[tfmm_sim::SimulationSummary]) -> Result<
         "mean_edge_bps_when_arb",
         "mean_threshold_bps_used",
         "mean_cost_usd_used",
+        // ▼ ここから下の5行を追加
+        "total_protocol_revenue_usd",
+        "total_validator_searcher_revenue_usd",
+        "total_lp_loss_proxy_usd",
+        "lvr_proxy_usd",
+        "lvr_proxy_ratio",
     ])?;
 
     for s in summaries {
@@ -1029,6 +1036,12 @@ fn write_sim_summaries_csv(summaries: &[tfmm_sim::SimulationSummary]) -> Result<
             s.mean_edge_bps_when_arb.to_string(),
             s.mean_threshold_bps_used.to_string(),
             s.mean_cost_usd_used.to_string(),
+            // ▼ ここから下の5行を追加
+            s.total_protocol_revenue_usd.to_string(),
+            s.total_validator_searcher_revenue_usd.to_string(),
+            s.total_lp_loss_proxy_usd.to_string(),
+            s.lvr_proxy_usd.to_string(),
+            s.lvr_proxy_ratio.to_string(),
         ])?;
     }
 

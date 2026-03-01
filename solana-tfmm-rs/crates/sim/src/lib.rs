@@ -441,8 +441,9 @@ fn apply_revenue_split(
             out.validator_searcher_revenue_usd = arb_net;
             out.arb_net_revenue_usd = 0.0;
 
+            // 修正箇所: protocol_revenue_usd を LPの損失に含めない
             out.lp_loss_proxy_usd =
-                out.protocol_revenue_usd + out.validator_searcher_revenue_usd + out.arb_net_revenue_usd;
+                out.validator_searcher_revenue_usd + out.arb_net_revenue_usd;
         }
         AuctionMode::PfdaWindowed(p) => {
             let pre_payment_net = (gross_extraction_usd - cost_usd).max(0.0);
@@ -465,8 +466,9 @@ fn apply_revenue_split(
             out.validator_searcher_revenue_usd = 0.0;
             out.arb_net_revenue_usd = winner_net;
 
+            // 修正箇所: protocol_revenue_usd を LPの損失に含めない
             out.lp_loss_proxy_usd =
-                out.protocol_revenue_usd + out.validator_searcher_revenue_usd + out.arb_net_revenue_usd;
+                out.validator_searcher_revenue_usd + out.arb_net_revenue_usd;
         }
     }
 
@@ -666,25 +668,85 @@ fn default_real_calibrated_base_config() -> SimulationConfig {
     cfg
 }
 
+// =========================
+// Preset experiment helpers (3 Pools Validation)
+// =========================
+
 pub fn run_pfda_baseline_vs_pfda() -> Result<Vec<SimulationSummary>> {
     let mut out = Vec::new();
 
-    let mut base = default_real_calibrated_base_config();
-    base.auction_mode = AuctionMode::Vanilla;
-
-    let (s1, _) = run_simulation(&base, "Vanilla (Mixture TH+Cost)")?;
-    out.push(s1);
-
-    let mut pfda = default_real_calibrated_base_config();
-    pfda.auction_mode = AuctionMode::PfdaWindowed(PfdaParams {
+    // 共通のPFDAパラメータ（最適な結果が出た設定）
+    let optimal_pfda_params = PfdaParams {
         window_slots: 50,
         fee_discount_bps: 1.0,
         auction_payment_mode: AuctionPaymentMode::RealizedExcessShare,
-        auction_competitiveness_alpha: 0.7,
-    });
+        auction_competitiveness_alpha: 0.9, // 競争激化を想定
+    };
 
-    let (s2, _) = run_simulation(&pfda, "PFDA Windowed (disc=1bps, alpha=0.7)")?;
-    out.push(s2);
+    // ---------------------------------------------------------
+    // プール1: SOL/USDT (標準的なボラティリティ・高流動性)
+    // ---------------------------------------------------------
+    let mut cfg_standard = SimulationConfig::default();
+    cfg_standard.sigma_annual = 0.80; // 年次ボラティリティ 80%
+    cfg_standard.threshold_mode = ThresholdMode::MixtureBps {
+        low_bps: 0.150, base_bps: 1.800, high_bps: 4.300,
+        w_low: 0.2, w_base: 0.6, w_high: 0.2,
+    };
+    cfg_standard.cost_mode = CostMode::FixedUsd(0.0008); // 手数料平均
+
+    // Vanilla (SOL/USDT)
+    cfg_standard.auction_mode = AuctionMode::Vanilla;
+    let (s1_v, _) = run_simulation(&cfg_standard, "[Pool 1: SOL/USDT] Vanilla TFMM")?;
+    out.push(s1_v);
+
+    // PFDA (SOL/USDT)
+    cfg_standard.auction_mode = AuctionMode::PfdaWindowed(optimal_pfda_params.clone());
+    let (s1_p, _) = run_simulation(&cfg_standard, "[Pool 1: SOL/USDT] PFDA TFMM")?;
+    out.push(s1_p);
+
+
+    // ---------------------------------------------------------
+    // プール2: SOL/pippin (ミームコイン・超高ボラティリティ)
+    // ---------------------------------------------------------
+    let mut cfg_meme = SimulationConfig::default();
+    cfg_meme.sigma_annual = 3.50; // 年次ボラティリティ 350% (激しい乱高下)
+    cfg_meme.threshold_mode = ThresholdMode::MixtureBps {
+        low_bps: 5.0, base_bps: 15.0, high_bps: 35.0, // スプレッドが非常に広い
+        w_low: 0.2, w_base: 0.6, w_high: 0.2,
+    };
+    cfg_meme.cost_mode = CostMode::FixedUsd(0.0020); // 優先手数料が高騰しやすい
+
+    // Vanilla (SOL/pippin)
+    cfg_meme.auction_mode = AuctionMode::Vanilla;
+    let (s2_v, _) = run_simulation(&cfg_meme, "[Pool 2: SOL/pippin] Vanilla TFMM")?;
+    out.push(s2_v);
+
+    // PFDA (SOL/pippin)
+    cfg_meme.auction_mode = AuctionMode::PfdaWindowed(optimal_pfda_params.clone());
+    let (s2_p, _) = run_simulation(&cfg_meme, "[Pool 2: SOL/pippin] PFDA TFMM")?;
+    out.push(s2_p);
+
+
+    // ---------------------------------------------------------
+    // プール3: SOL/jitoSOL (LST・超低ボラティリティ)
+    // ---------------------------------------------------------
+    let mut cfg_lst = SimulationConfig::default();
+    cfg_lst.sigma_annual = 0.10; // 年次ボラティリティ 10% (ほぼ価格が連動)
+    cfg_lst.threshold_mode = ThresholdMode::MixtureBps {
+        low_bps: 0.05, base_bps: 0.20, high_bps: 0.50, // スプレッドが極端に狭い
+        w_low: 0.2, w_base: 0.6, w_high: 0.2,
+    };
+    cfg_lst.cost_mode = CostMode::FixedUsd(0.0004); // 安い手数料で細かく抜かれる
+
+    // Vanilla (SOL/jitoSOL)
+    cfg_lst.auction_mode = AuctionMode::Vanilla;
+    let (s3_v, _) = run_simulation(&cfg_lst, "[Pool 3: SOL/jitoSOL] Vanilla TFMM")?;
+    out.push(s3_v);
+
+    // PFDA (SOL/jitoSOL)
+    cfg_lst.auction_mode = AuctionMode::PfdaWindowed(optimal_pfda_params.clone());
+    let (s3_p, _) = run_simulation(&cfg_lst, "[Pool 3: SOL/jitoSOL] PFDA TFMM")?;
+    out.push(s3_p);
 
     Ok(out)
 }
