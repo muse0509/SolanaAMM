@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cargo test:*)"
+      "Bash(cargo test:*)",
+      "Bash(cargo-build-sbf:*)",
+      "Bash(solana config:*)",
+      "Bash(solana address:*)",
+      "Bash(solana program:*)",
+      "Bash(solana:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

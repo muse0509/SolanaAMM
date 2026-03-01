@@ -5,6 +5,15 @@
 
 #![cfg_attr(not(test), no_std)]
 
+// `no_std` SBF builds require an explicit #[panic_handler].
+// pinocchio's entrypoint! macro only provides `custom_panic` (the Solana
+// runtime hook) but not the Rust-level panic handler.
+#[cfg(all(not(test), target_os = "solana"))]
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    unsafe { core::hint::unreachable_unchecked() }
+}
+
 pub mod error;
 pub mod instructions;
 pub mod math;
@@ -24,6 +33,8 @@ enum Instruction {
     SwapRequest = 1,
     ClearBatch = 2,
     Claim = 3,
+    AddLiquidity = 4,
+    UpdateWeight = 5,
 }
 
 impl Instruction {
@@ -33,6 +44,8 @@ impl Instruction {
             1 => Some(Instruction::SwapRequest),
             2 => Some(Instruction::ClearBatch),
             3 => Some(Instruction::Claim),
+            4 => Some(Instruction::AddLiquidity),
+            5 => Some(Instruction::UpdateWeight),
             _ => None,
         }
     }
@@ -106,6 +119,32 @@ pub fn process_instruction(
         Instruction::Claim => {
             // No additional data needed (all context from accounts)
             instructions::process_claim(program_id, accounts)
+        }
+
+        Instruction::AddLiquidity => {
+            // Layout: [amount_a: u64 LE][amount_b: u64 LE]
+            if data.len() < 16 {
+                return Err(ProgramError::InvalidInstructionData);
+            }
+            let amount_a = u64::from_le_bytes([
+                data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
+            ]);
+            let amount_b = u64::from_le_bytes([
+                data[8], data[9], data[10], data[11], data[12], data[13], data[14], data[15],
+            ]);
+            instructions::process_add_liquidity(program_id, accounts, amount_a, amount_b)
+        }
+
+        Instruction::UpdateWeight => {
+            // Layout: [target_weight_a: u32 LE][weight_end_slot: u64 LE] = 12 bytes
+            if data.len() < 12 {
+                return Err(ProgramError::InvalidInstructionData);
+            }
+            let target_weight_a = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+            let weight_end_slot = u64::from_le_bytes([
+                data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11],
+            ]);
+            instructions::process_update_weight(program_id, accounts, target_weight_a, weight_end_slot)
         }
     }
 }

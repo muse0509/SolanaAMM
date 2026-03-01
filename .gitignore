@@ -1,0 +1,59 @@
+# ──────────────────────────────────────────────
+# Rust / Cargo
+# ──────────────────────────────────────────────
+target/
+Cargo.lock          # uncomment to track lockfile for applications
+
+# ──────────────────────────────────────────────
+# Solana / SBF
+# ──────────────────────────────────────────────
+# Compiled program binaries
+*.so
+deploy/
+
+# Test validator ledger data (can be gigabytes)
+test-ledger/
+ledger/
+
+# ──────────────────────────────────────────────
+# Node.js / TypeScript (client)
+# ──────────────────────────────────────────────
+node_modules/
+dist/
+*.js.map
+
+# ──────────────────────────────────────────────
+# Benchmark / generated output
+# ──────────────────────────────────────────────
+results/
+
+# ──────────────────────────────────────────────
+# Secret / credential files  ← IMPORTANT
+# ──────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# Solana wallet / keypair files (contain private keys)
+id.json
+*-keypair.json
+*_keypair.json
+wallet.json
+
+# ──────────────────────────────────────────────
+# Python virtualenv (solana-tfmm-rs scripts)
+# ──────────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# ──────────────────────────────────────────────
+# IDE / OS
+# ──────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
