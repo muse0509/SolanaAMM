@@ -21,10 +21,15 @@ pub const MAX_NAV_DEVIATION_BPS: u64 = 300;
 /// Closes the cheap-attacker leg of the inflation / donation attack:
 /// without this, an attacker could seed with `amount = 1`, then donate
 /// huge quantities of basket tokens directly into the vault ATAs to
-/// push every proportional-mint candidate to zero for the next
-/// legitimate depositor (they would revert on `ZeroDeposit`, bricking
-/// the pool). 1_000_000 = 1 token at 6 decimals.
-pub const MIN_FIRST_DEPOSIT: u64 = 1_000_000;
+/// push every proportional-mint candidate to zero for the next legitimate
+/// depositor (they would revert on `ZeroDeposit`, bricking the pool).
+///
+/// Keep this above `MINIMUM_LIQUIDITY`, but do not force a full 1.0 ETF at
+/// genesis. A 1_000_000 floor made high-value, low-raw-unit basket legs
+/// (wBTC/wETH) require too much SOL just to bootstrap. 10_000 = 0.01 ETF
+/// at 6 decimals, which preserves the virtual-liquidity defense while
+/// making mixed-decimal/high-price baskets deployable.
+pub const MIN_FIRST_DEPOSIT: u64 = 10_000;
 
 /// Virtual liquidity lock added to `etf.total_supply` on the first
 /// deposit but never minted to any holder. Combined with

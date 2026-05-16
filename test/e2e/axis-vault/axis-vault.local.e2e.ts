@@ -1174,10 +1174,10 @@ async function main() {
   {
     const fresh = await spinUpFreshEtf("DONATE");
 
-    // Legit first deposit at exactly MIN_FIRST_DEPOSIT (1 token @ 6 dp).
+    // Legit first deposit at exactly MIN_FIRST_DEPOSIT (0.01 ETF @ 6 dp).
     const firstData = Buffer.concat([
       Buffer.from([1]),
-      u64Le(1_000_000n),
+      u64Le(10_000n),
       u64Le(0n),
       Buffer.from([fresh.name.length]),
       fresh.name,
@@ -1205,7 +1205,7 @@ async function main() {
     // (bypasses Deposit) at the target weight ratio so NAV deviation
     // does not fire. Scale = 10_000x the legit leg amounts.
     for (let i = 0; i < TOKEN_COUNT; i++) {
-      const legitLeg = 1_000_000n * BigInt(WEIGHTS[i]) / 10_000n;
+      const legitLeg = 10_000n * BigInt(WEIGHTS[i]) / 10_000n;
       const donation = legitLeg * 10_000n;
       await mintTo(conn, payer, mints[i], fresh.vPks[i], payer, donation);
     }

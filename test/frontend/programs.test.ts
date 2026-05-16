@@ -5,6 +5,7 @@ import {
 } from "../../frontend/src/lib/programs";
 import {
   buildJupiterSeedPreview,
+  createMockJupiterQuoteClient,
   type JupiterQuoteClient,
 } from "../../frontend/src/lib/jupiterSeed";
 
@@ -66,5 +67,28 @@ describe("frontend Jupiter seed preview", () => {
     expect(preview.depositAmount).toBe(60_000n);
     expect(preview.bottleneckIndex).toBe(1);
     expect(preview.mode).toBe("mock");
+  });
+
+  test("reallocates SOL toward the deposit-floor bottleneck when quotes improve", async () => {
+    const mintA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    const mintB = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY8wYb6Fq4jmWZtj";
+    const quoteClient = createMockJupiterQuoteClient({
+      outputBpsByMint: {
+        [mintA]: 20_000,
+        [mintB]: 10_000,
+      },
+    });
+
+    const preview = await buildJupiterSeedPreview({
+      basketMints: [mintA, mintB],
+      weights: [6_000, 4_000],
+      solIn: 1_000n,
+      slippageBps: 0,
+      quoteClient,
+    });
+
+    expect(preview.allocationMode).toBe("equalized");
+    expect(preview.legs.map((leg) => leg.solLamports)).toEqual([428n, 572n]);
+    expect(preview.depositAmount).toBeGreaterThan(1_000n);
   });
 });

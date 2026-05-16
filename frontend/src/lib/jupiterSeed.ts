@@ -40,6 +40,7 @@ export interface JupiterSeedLegPreview {
 
 export interface JupiterSeedPreview {
   mode: JupiterQuoteMode;
+  allocationMode: "weighted" | "equalized";
   solIn: bigint;
   slippageBps: number;
   depositAmount: bigint;
@@ -97,19 +98,38 @@ export async function buildJupiterSeedPreview({
   );
   validateSeedInputs(mints, weights, solIn);
 
-  const legLamports = splitWeightedLamports(solIn, weights);
-  const quoteResults = await Promise.all(
-    mints.map((mint, i) =>
-      quoteClient.getQuote({
-        inputMint: SOL_MINT,
-        outputMint: mint,
-        amount: legLamports[i],
-        slippageBps,
-        swapMode: "ExactIn",
-        maxAccounts,
-      }),
-    ),
+  const quoteRound = (legLamports: bigint[]) =>
+    Promise.all(
+      mints.map((mint, i) =>
+        quoteLegSol(quoteClient, mint, legLamports[i], slippageBps, maxAccounts),
+      ),
+    );
+
+  const legLamports0 = splitWeightedLamports(solIn, weights);
+  const quotes0 = await quoteRound(legLamports0);
+
+  const legLamports1 = reallocateEqualizingCandidates(
+    solIn,
+    weights,
+    legLamports0,
+    quotes0,
   );
+  let legLamports = legLamports0;
+  let quoteResults = quotes0;
+  let allocationMode: JupiterSeedPreview["allocationMode"] = "weighted";
+  if (legLamports1 !== legLamports0) {
+    try {
+      const quotes1 = await quoteRound(legLamports1);
+      if (minDepositCandidate(quotes1, weights) > minDepositCandidate(quotes0, weights)) {
+        legLamports = legLamports1;
+        quoteResults = quotes1;
+        allocationMode = "equalized";
+      }
+    } catch {
+      // Equalization is an optimization. If a reduced cheap leg falls under a
+      // Jupiter route floor, keep the already-valid weighted quote.
+    }
+  }
 
   const legs = quoteResults.map((quote, i) => {
     const minOut = BigInt(quote.otherAmountThreshold);
@@ -134,6 +154,7 @@ export async function buildJupiterSeedPreview({
 
   return {
     mode: quoteClient.mode,
+    allocationMode,
     solIn,
     slippageBps,
     depositAmount: legs[bottleneckIndex].depositCandidate,
@@ -170,6 +191,87 @@ function splitWeightedLamports(solIn: bigint, weights: number[]): bigint[] {
   const assigned = legs.reduce((sum, lamports) => sum + lamports, 0n);
   legs[legs.length - 1] += solIn - assigned;
   return legs;
+}
+
+function quoteLegSol(
+  quoteClient: JupiterQuoteClient,
+  mint: PublicKey,
+  lamports: bigint,
+  slippageBps: number,
+  maxAccounts: number,
+): Promise<JupiterQuoteResponse> {
+  if (mint.equals(SOL_MINT)) {
+    const out = lamports.toString();
+    return Promise.resolve({
+      inputMint: SOL_MINT.toBase58(),
+      outputMint: mint.toBase58(),
+      inAmount: out,
+      outAmount: out,
+      otherAmountThreshold: out,
+      swapMode: "ExactIn",
+      slippageBps,
+      priceImpactPct: "0",
+      routePlan: [{ swapInfo: { label: "wrap" }, percent: 100 }],
+      contextSlot: 0,
+    });
+  }
+  return quoteClient.getQuote({
+    inputMint: SOL_MINT,
+    outputMint: mint,
+    amount: lamports,
+    slippageBps,
+    swapMode: "ExactIn",
+    maxAccounts,
+  });
+}
+
+function minDepositCandidate(
+  quotes: JupiterQuoteResponse[],
+  weights: number[],
+): bigint {
+  let lo: bigint | null = null;
+  for (let i = 0; i < quotes.length; i++) {
+    const candidate =
+      (BigInt(quotes[i].otherAmountThreshold) * 10_000n) / BigInt(weights[i]);
+    if (lo === null || candidate < lo) lo = candidate;
+  }
+  return lo ?? 0n;
+}
+
+function reallocateEqualizingCandidates(
+  solIn: bigint,
+  weights: number[],
+  legLamports0: bigint[],
+  quotes0: JupiterQuoteResponse[],
+): bigint[] {
+  const scale = 1_000_000_000_000n;
+  const ratios: bigint[] = new Array(weights.length);
+  for (let i = 0; i < weights.length; i++) {
+    const minOut0 = BigInt(quotes0[i].otherAmountThreshold);
+    if (legLamports0[i] <= 0n || minOut0 <= 0n) return legLamports0;
+    const ratio = (BigInt(weights[i]) * legLamports0[i] * scale) / minOut0;
+    if (ratio <= 0n) return legLamports0;
+    ratios[i] = ratio;
+  }
+  const ratioSum = ratios.reduce((a, b) => a + b, 0n);
+  if (ratioSum <= 0n) return legLamports0;
+
+  const out = ratios.map((ratio) => (solIn * ratio) / ratioSum);
+  const assigned = out.reduce((a, b) => a + b, 0n);
+  let biggest = 0;
+  for (let i = 1; i < out.length; i++) if (out[i] > out[biggest]) biggest = i;
+  out[biggest] += solIn - assigned;
+  for (const leg of out) if (leg <= 0n) return legLamports0;
+
+  let changed = false;
+  for (let i = 0; i < out.length; i++) {
+    const diff = Number(out[i] - legLamports0[i]);
+    if (Math.abs(diff) > Number(legLamports0[i]) * 0.005 + 1) {
+      changed = true;
+      break;
+    }
+  }
+  return changed ? out : legLamports0;
 }
 
 function extractRouteLabel(quote: JupiterQuoteResponse): string {

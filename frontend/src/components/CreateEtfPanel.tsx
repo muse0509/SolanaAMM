@@ -52,11 +52,11 @@ export function CreateEtfPanel({
   const [uri, setUri] = useState("");
   const [rows, setRows] = useState<BasketRow[]>([]);
   // Default 1_000_000_000 = 1000 tokens at 6 decimals, matches the e2e
-  // test. The program rejects amount < MIN_FIRST_DEPOSIT (1_000_000)
+  // test. The program rejects amount < MIN_FIRST_DEPOSIT (10_000)
   // with InsufficientFirstDeposit (0x233A / 9018) on the first deposit.
   const [depositBase, setDepositBase] = useState<number>(1_000_000_000);
-  // 0.02 SOL clears the on-chain MIN_FIRST_DEPOSIT (1.0 ETF base) for
-  // typical mainnet routes at SOL ≈ $80-150. Smaller seeds will be
+  // 0.02 SOL comfortably clears the on-chain MIN_FIRST_DEPOSIT (0.01 ETF
+  // base) for typical mainnet routes. Smaller seeds can still be
   // refused by `buildDepositSolPlan` with a recommended bump.
   const [solSeed, setSolSeed] = useState<number>(0.02);
   const [slippageBps, setSlippageBps] = useState<number>(50);
@@ -390,28 +390,28 @@ export function CreateEtfPanel({
                     />
                   </label>
                   <span className="text-[11px] text-slate-500">
-                    First deposit must yield ≥ 1.0 ETF (1_000_000 base units);
+                    First deposit must yield ≥ 0.01 ETF (10_000 base units);
                     plan-builder rejects smaller seeds before sending.
                   </span>
                 </>
               ) : doDepositAfter && (
                 <label className="flex items-center gap-1">
                   <span className="text-slate-400">
-                    base amount (≥ 1_000_000; per-leg = amount × weight ÷ 10000):
+                    base amount (≥ 10_000; per-leg = amount × weight ÷ 10000):
                   </span>
                   <input
                     type="number"
-                    min={1_000_000}
-                    step={1_000_000}
+                    min={10_000}
+                    step={10_000}
                     value={depositBase}
                     onChange={(e) => setDepositBase(Number(e.target.value))}
                     className="w-40 rounded bg-slate-800 px-2 py-1 font-mono text-slate-100"
                   />
                 </label>
               )}
-              {doDepositAfter && !config.jupiterEnabled && depositBase < 1_000_000 && (
+              {doDepositAfter && !config.jupiterEnabled && depositBase < 10_000 && (
                 <span className="text-xs text-rose-400">
-                  ✗ amount &lt; MIN_FIRST_DEPOSIT (1_000_000) — first Deposit will revert with InsufficientFirstDeposit
+                  ✗ amount &lt; MIN_FIRST_DEPOSIT (10_000) — first Deposit will revert with InsufficientFirstDeposit
                 </span>
               )}
             </div>

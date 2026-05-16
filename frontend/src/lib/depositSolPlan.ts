@@ -37,12 +37,12 @@ export const SOLANA_MAX_TX_CU = 1_400_000;
 export const SOLANA_MAX_TX_BYTES = 1232;
 /// Lamports of priority fee per CU when Jupiter doesn't supply one.
 const FALLBACK_PRIORITY_MICRO_LAMPORTS = 50_000;
-/// Mirrors `axis-vault` constants: `MIN_FIRST_DEPOSIT = 1_000_000`
-/// (= 1.0 ETF at 6 decimals). On-chain Deposit rejects with
+/// Mirrors `axis-vault` constants: `MIN_FIRST_DEPOSIT = 10_000`
+/// (= 0.01 ETF at 6 decimals). On-chain Deposit rejects with
 /// `InsufficientFirstDeposit` (0x233a) if `total_supply == 0` and
 /// `amount < MIN_FIRST_DEPOSIT_BASE`. We mirror the constant here so a
 /// doomed plan fails before a Jupiter swap tx burns user funds.
-export const MIN_FIRST_DEPOSIT_BASE = 1_000_000n;
+export const MIN_FIRST_DEPOSIT_BASE = 10_000n;
 
 export interface DepositSolPlanArgs {
   conn: Connection;
@@ -297,7 +297,7 @@ export async function buildDepositSolPlan(
       (args.solIn * MIN_FIRST_DEPOSIT_BASE * 11n) /
       (seedPreview.depositAmount * 10n);
     throw new Error(
-      `First deposit must yield ≥ ${MIN_FIRST_DEPOSIT_BASE} base units (1.0 ETF). ` +
+      `First deposit must yield ≥ ${MIN_FIRST_DEPOSIT_BASE} base units (0.01 ETF). ` +
         `At ${args.solIn} lamports (${(Number(args.solIn) / 1e9).toFixed(6)} SOL) the bottleneck floor is ` +
         `${seedPreview.depositAmount} base. Increase SOL seed to at least ` +
         `~${suggestedLamports} lamports (≈ ${(Number(suggestedLamports) / 1e9).toFixed(4)} SOL) and retry. ` +

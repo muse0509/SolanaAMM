@@ -213,7 +213,7 @@ function labelForCode(hex: string): string | null {
     "0x2337": "axis-vault: SlippageExceeded",           // 9015
     "0x2338": "axis-vault: NavDeviationExceeded",       // 9016
     "0x2339": "axis-vault: TreasuryMismatch",           // 9017
-    "0x233a": "axis-vault: InsufficientFirstDeposit (amount must be >= 1_000_000 base units)", // 9018
+    "0x233a": "axis-vault: InsufficientFirstDeposit (amount must be >= 10_000 base units)", // 9018
     "0x233b": "axis-vault: InvalidTicker (A-Z 0-9, 2..16 bytes)", // 9019
     "0x233c": "axis-vault: InvalidName (>32 bytes or empty)", // 9020
     "0x233d": "axis-vault: SweepForbidden",            // 9021
